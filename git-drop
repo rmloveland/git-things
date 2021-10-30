@@ -1,0 +1,3 @@
+#!/usr/bin/env sh
+
+git checkout -- $(git status | egrep '(modified|typechange)' | awk '{print $2}' | fzf)
