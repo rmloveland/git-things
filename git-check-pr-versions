@@ -1,0 +1,83 @@
+#!/usr/bin/env python3
+
+import re
+import sys
+import subprocess
+import urllib.request
+import html.parser
+
+# Check for PR URL argument
+if len(sys.argv) != 2:
+    print("Usage: {} <GitHub PR URL>".format(sys.argv[0]))
+    sys.exit(1)
+
+pr_url = sys.argv[1]
+
+# Function to run a git command and return the output
+def run_git_command(*args):
+    result = subprocess.run(['git'] + list(args), stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    if result.returncode != 0:
+        raise Exception("Git command failed: {}".format(result.stderr.strip()))
+    return result.stdout.strip()
+
+# Get remote URL and check if it's hosted on GitHub
+try:
+    remote_url = run_git_command('config', '--get', 'remote.origin.url')
+except Exception as e:
+    print(e)
+    sys.exit(1)
+
+if 'github.com' not in remote_url:
+    print("Remote is not hosted on GitHub")
+    sys.exit(1)
+
+# Fetch HTML of PR URL
+try:
+    pr_url += '/commits'
+    response = urllib.request.urlopen(pr_url)
+    html_content = response.read().decode('utf-8')
+except Exception as e:
+    print("Failed to fetch PR URL: {}".format(e))
+    sys.exit(1)
+
+# Parse HTML to find SHAs
+class PRHTMLParser(html.parser.HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.shas = []
+        self.in_sha_link = False
+
+    def handle_starttag(self, tag, attrs):
+        attrs = dict(attrs)
+        if tag == 'span' and attrs.get('class') == 'Button-label':
+            self.in_sha_link = True
+
+    def handle_endtag(self, tag):
+        if tag == 'a' and self.in_sha_link:
+            self.in_sha_link = False
+
+    def handle_data(self, data):
+        sha_pattern = re.compile(r'\b[0-9a-f]+\b', re.IGNORECASE)
+        clean_data = data.strip()
+        if self.in_sha_link:
+            match = re.search(sha_pattern, clean_data)
+            if match:
+                self.shas.append(data)
+
+parser = PRHTMLParser()
+parser.feed(html_content)
+
+shas = parser.shas
+if not shas:
+    print("No SHAs found in the PR")
+    sys.exit(1)
+
+for sha in shas:
+    try:
+        merged_version = run_git_command('tag', '--contains', sha)
+        print("SHA {} is merged into version {}".format(sha, merged_version))
+    except Exception:
+        print("SHA {} is not merged".format(sha))
+        all_merged = False
+
+sys.exit(0)
