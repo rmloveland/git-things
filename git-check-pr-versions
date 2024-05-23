@@ -75,7 +75,10 @@ if not shas:
 for sha in shas:
     try:
         merged_version = run_git_command('tag', '--contains', sha)
-        print("SHA {} is merged into version {}".format(sha, merged_version))
+        if merged_version:
+            print("SHA {} is merged into version {}".format(sha, merged_version))
+        else:
+            print("SHA {} is not yet in a tagged release".format(sha))
     except Exception:
         print("SHA {} is not merged".format(sha))
         all_merged = False
