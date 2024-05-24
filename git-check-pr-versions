@@ -60,7 +60,7 @@ class PRHTMLParser(html.parser.HTMLParser):
         sha_pattern = re.compile(r'\b[0-9a-f]+\b', re.IGNORECASE)
         clean_data = data.strip()
         if self.in_sha_link:
-            match = re.search(sha_pattern, clean_data)
+            match = re.match(sha_pattern, clean_data)
             if match:
                 self.shas.append(data)
 
