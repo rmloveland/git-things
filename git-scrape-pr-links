@@ -1,0 +1,47 @@
+#!/usr/bin/env python3
+
+import re
+import sys
+import subprocess
+import urllib.request
+import html.parser
+
+# Check for Issue URL argument
+if len(sys.argv) != 2:
+    print("Usage: {} <GitHub Issue URL>".format(sys.argv[0]))
+    sys.exit(1)
+
+issue_url = sys.argv[1]
+
+# Fetch HTML of PR URL
+try:
+    response = urllib.request.urlopen(issue_url)
+    html_content = response.read().decode('utf-8')
+except Exception as e:
+    print("Failed to fetch Issue URL: {}".format(e))
+    sys.exit(1)
+
+# Parse HTML to find SHAs
+class GithubParser(html.parser.HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.pr_links = []
+
+    def handle_starttag(self, tag, attrs):
+        if tag == 'a':
+            href = dict(attrs).get('href', '')
+            if re.match(r'https://github.com/.*/.*/pull/\d+', href):
+                self.pr_links.append(href)
+
+parser = GithubParser()
+parser.feed(html_content)
+
+pr_links = parser.pr_links
+if not pr_links:
+    print("No PR links found that mentioned the issue: " + issue_url)
+    sys.exit(1)
+
+for pr_link in pr_links:
+    print(pr_link)
+
+sys.exit(0)
